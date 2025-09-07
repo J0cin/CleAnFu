@@ -1,0 +1,114 @@
+# ===================================================================
+#             CONFIGURACIÓN GENERAL DEL PIPELINE
+# ===================================================================
+output_dir: "/data/users/cintaobj/FANTASIA/results"
+logging_level: "INFO"
+
+# ===================================================================
+#             SECCIÓN DE ENTRADA (INPUT)
+# ===================================================================
+input:
+  type: "directory_stats" 
+  path: "/data/users/cintaobj/FANTASIA/metadata/Listall_clean.txt"
+  file_pattern: ["_clean.fasta", "_clean_proteins.fasta"]
+
+# ===================================================================
+#             SECCIÓN DE FANTASIA
+# ===================================================================
+fantasia:
+  cmd: "/data/users/cintaobj/00_local_tools/FANTASIA/FANTASIA/launch_gopredsim_pipeline.sh"
+  prepare_cmd: "/data/users/cintaobj/00_local_tools/FANTASIA/FANTASIA/generate_gopredsim_input_files.sh"
+  GO_cmd: "/data/users/cintaobj/00_local_tools/FANTASIA/FANTASIA/convert_topgo_format.py"
+  fantasia_results_dir: "FANTASIA_results"
+  fantasia_dir: "fantasia_run"
+  model: "prott5"
+  model_path: null
+  batch_size: 64
+  device: "GPU"
+
+# ===================================================================
+#             SECCIÓN DE DIAMOND Y AHRD (HOMOLOGÍA)
+# ===================================================================
+diamond:
+  threads: 24
+  max_workers: 3
+  evalue: 1.0e-20
+  output_format: "6"
+  max_target_seqs: 1
+  output_suffix: "homology_funct_ahrd.txt"
+
+  ahrd:
+    cmd_path: "/data/software/AHRD/dist/ahrd.jar"
+    goa_path: "/data/shared_dbs/swissprot/goa_uniprot_all.gaf"
+    prefer_reference_with_go_annos: true
+    reference_go_regex: '^UniProtKB\t(?<shortAccession>[^\t]+)\t[^\t]+\t(?!NOT\|)[^\t]*\t(?<goTerm>GO:\d{7})'
+    token_score_bit_score_weight: 0.468
+    token_score_database_score_weight: 0.2098
+    token_score_overlap_score_weight: 0.3221
+
+  databases:
+    SwissProt:
+      db_path: "/data/shared_dbs/swissprot/uniprot_sprot_r2024_01.dmnd"
+      weight: 653
+      description_score_bit_score_weight: 2.717061
+      # --- Rutas a los archivos de filtro/blacklist ---
+      blacklist: /data/software/AHRD/test/resources/blacklist_descline.txt
+      filter: /data/software/AHRD/test/resources/filter_descline_sprot.txt
+      token_blacklist: /data/software/AHRD/test/resources/blacklist_token.txt
+
+    TrEMBL:
+      db_path: "/data/shared_dbs/swissprot/uniprot_trembl_r2024_01.dmnd"
+      weight: 904
+      description_score_bit_score_weight: 2.590211
+      # --- Rutas a los archivos de filtro/blacklist ---
+      blacklist: /data/software/AHRD/test/resources/blacklist_descline.txt
+      filter: /data/software/AHRD/test/resources/filter_descline_trembl.txt
+      token_blacklist: /data/software/AHRD/test/resources/blacklist_token.txt
+
+# ===================================================================
+#             SECCIÓN DE ESTADÍSTICAS (COMPARISON_STATS)
+# ===================================================================
+stats:
+  Files_HOMOLOGY_identifier: "homology_funct_ahrd.txt" 
+  Files_FAN_identifier: "_FANTASIA_TopGO.txt"
+  output_suffix: "merged.txt"
+  Run_get_stats: true
+  outfile_name: "SWP_TREMBL_GO"
+  merge_column: "Protein-Accession"
+  output_dir: "stats_result"
+
+# ===================================================================
+#             SECCIONES ADICIONALES (Compatibilidad)
+# ===================================================================
+busco:
+  busco_cmd: "busco"
+  mode: "prot"
+  threads: 24
+  cpu: 24
+  timeout: 1200
+  output_dir: "busco_results"
+
+agat:
+  keep_longest_cmd: "agat_sp_keep_longest_isoform.pl"
+  agat_stats_cmd: "agat_sp_statistics.pl"
+  output_suffix: ".longest_isof"
+  required_stats:
+    - "Number of single exon gene"
+    - "Number gene overlapping"
+    - "mean gene length (bp)"
+    - "mean cds length (bp)"
+  patterns:
+    "Number of single exon gene": "Number of single exon gene\\s*(\\d+)"
+    "Number gene overlapping": "Number gene overlapping\\s*(\\d+)"
+    "mean gene length (bp)": "mean gene length \\(bp\\)\\s*(\\d+\\.?\\d*)"
+    "mean cds length (bp)": "mean cds length \\(bp\\)\\s*(\\d+\\.?\\d*)"
+  output_dir: "agat_results"
+
+cleaning:
+  input_pattern: [".fa", ".fasta", ".fs"]
+  max_length: 3500
+
+gffread:
+  cmd: "gffread"
+  output_suffix: ".fasta"
+  genome_pattern: ["fna"]
